@@ -11,7 +11,7 @@
 /// * [User guide documentation](https://help.syncfusion.com/flutter/pdf-viewer/overview)
 /// * [Video tutorials](https://www.syncfusion.com/tutorial-videos/flutter/pdf-viewer)
 /// * [Knowledge base](https://www.syncfusion.com/kb/flutter)
-// ignore_for_file: avoid_setters_without_getters, use_setters_to_change_properties
+// ignore_for_file: avoid_setters_without_getters, use_setters_to_change_properties, dangling_library_doc_comments
 
 import 'dart:async';
 import 'dart:io';
@@ -154,6 +154,8 @@ class SfPdfViewer extends StatefulWidget {
     String name, {
     Key? key,
     AssetBundle? bundle,
+    this.documentOrientation,
+    this.documentSize,
     this.canShowScrollHead = true,
     this.pageSpacing = 4,
     this.controller,
@@ -659,7 +661,12 @@ class SfPdfViewer extends StatefulWidget {
   ///  }
   ///}
   /// ```
+  ///
   final PdfViewerController? controller;
+
+  String? documentOrientation;
+
+  Size? documentSize;
 
   /// Controls the annotation undo state.
   final UndoHistoryController? undoController;
@@ -1148,7 +1155,6 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
   final List<int> _matchedTextPageIndices = <int>[];
   final Map<int, String> _extractedTextCollection = <int, String>{};
   Isolate? _textSearchIsolate;
-  Isolate? _textExtractionIsolate;
   bool _isTablet = false;
   bool _isAndroidTV = false;
   int _startPageIndex = 1;
@@ -1206,6 +1212,9 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
   Rect _textSelectionRegion = Rect.zero;
   Rect? _viewportGlobalRect;
   OverlayEntry? _textSelectionOverlayEntry;
+
+  /// Used to extract text from the PDF document.
+  // TextExtractionEngine? _textExtractionEngine;
 
   @override
   void initState() {
@@ -1337,7 +1346,8 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
     imageCache.clear();
     _killTextSearchIsolate();
     _plugin.closeDocument();
-    _killTextExtractionIsolate();
+    // _textExtractionEngine?.dispose();
+    // _textExtractionEngine = null;
     _disposeCollection(_originalHeight);
     _disposeCollection(_originalWidth);
     _renderedImages.clear();
@@ -1390,7 +1400,8 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
         ?.disposeMouseSelection();
     _isTextSelectionCleared = false;
     _isLoaded = false;
-    _killTextExtractionIsolate();
+    // _textExtractionEngine?.dispose();
+    // _textExtractionEngine = null;
     _killTextSearchIsolate();
     _isEncrypted = false;
     _matchedTextPageIndices.clear();
@@ -1954,9 +1965,9 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
         _retrieveFormFieldsDetails();
         _retrieveAnnotations();
         _pdfTextExtractor = PdfTextExtractor(_document!);
-        if (!kIsWeb) {
-          _performTextExtraction();
-        }
+        // if (!kIsWeb) {
+        //   _performTextExtraction();
+        // }
       }
       final int pageCount = await _plugin
           .initializePdfRenderer(_renderDigitalSignatures() ?? _pdfBytes);
@@ -1977,7 +1988,8 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
     } catch (e) {
       _pdfViewerController._reset();
       _hasError = true;
-      _killTextExtractionIsolate();
+      // _textExtractionEngine?.dispose();
+      // _textExtractionEngine = null;
       final String errorMessage = e.toString();
       if (errorMessage.contains('Invalid cross reference table') ||
           errorMessage.contains('FormatException: Invalid radix-10 number') ||
@@ -2063,49 +2075,20 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
   }
 
   /// Perform text extraction for mobile, windows and macOS platforms.
-  Future<void> _performTextExtraction() async {
-    final ReceivePort receivePort = ReceivePort();
-    receivePort.listen((dynamic message) {
-      if (message is SendPort) {
-        message.send(<dynamic>[
-          receivePort.sendPort,
-          _pdfTextExtractor,
-          _document?.pages.count,
-        ]);
-      } else if (message is Map<int, String>) {
-        _extractedTextCollection.addAll(message);
-        _isTextExtractionCompleted = true;
-        if (_pdfViewerController._searchText.isNotEmpty) {
-          _pdfViewerController._notifyPropertyChangedListeners(
-              property: 'searchText');
-        }
-      }
-    });
-    _textExtractionIsolate =
-        await Isolate.spawn(_extractTextAsync, receivePort.sendPort);
-  }
+  // Future<void> _performTextExtraction() async {
+  //   if (_document != null && _document!.pages.count > 0) {
+  //     _textExtractionEngine = TextExtractionEngine(_document!);
 
-  /// Text extraction runs in a separate thread
-  static Future<void> _extractTextAsync(SendPort sendPort) async {
-    final ReceivePort receivePort = ReceivePort();
-    sendPort.send(receivePort.sendPort);
-    // ignore: always_specify_types
-    final documentDetails = await receivePort.first;
-    final SendPort replyPort = documentDetails[0];
-    final Map<int, String> extractedTextCollection = <int, String>{};
-    for (int i = 0; i < documentDetails[2]; i++) {
-      extractedTextCollection[i] =
-          documentDetails[1].extractText(startPageIndex: i).toLowerCase();
-    }
-    replyPort.send(extractedTextCollection);
-  }
-
-  /// Terminates the text extraction isolate.
-  void _killTextExtractionIsolate() {
-    if (_textExtractionIsolate != null) {
-      _textExtractionIsolate?.kill(priority: Isolate.immediate);
-    }
-  }
+  //     _textExtractionEngine!.extractText().then((Map<int, String> value) {
+  //       _extractedTextCollection.addAll(value);
+  //       _isTextExtractionCompleted = true;
+  //       if (_pdfViewerController._searchText.isNotEmpty) {
+  //         _pdfViewerController._notifyPropertyChangedListeners(
+  //             property: 'searchText');
+  //       }
+  //     });
+  //   }
+  // }
 
   /// Show the password dialog box for web.
   Widget _showWebPasswordDialogue() {
@@ -2415,6 +2398,15 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
         },
       ),
     );
+  }
+
+  PdfPageOrientation getOrientation(String value) {
+    debugPrint('orientation $value');
+    if (value == 'LANDSCAPE') {
+      return PdfPageOrientation.landscape;
+    }
+
+    return PdfPageOrientation.portrait;
   }
 
   ///validate the password for encrypted document for web.
@@ -2817,14 +2809,12 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
     } else if (_layoutChangeOffset != Offset.zero &&
         (!_pdfDimension.isEmpty &&
             _pdfScrollableStateKey.currentState != null)) {
-      final double xOffset =
-          widget.scrollDirection != PdfScrollDirection.vertical
-              ? _pdfPages[_previousSinglePage]!.pageOffset
-              : 0;
-      final double yOffset =
-          widget.scrollDirection == PdfScrollDirection.vertical
-              ? _pdfPages[_previousSinglePage]!.pageOffset
-              : 0;
+      final double xOffset = _scrollDirection != PdfScrollDirection.vertical
+          ? _pdfPages[_previousSinglePage]!.pageOffset
+          : 0;
+      final double yOffset = _scrollDirection == PdfScrollDirection.vertical
+          ? _pdfPages[_previousSinglePage]!.pageOffset
+          : 0;
       _pdfScrollableStateKey.currentState!.jumpTo(
           xOffset: xOffset + _layoutChangeOffset.dx,
           yOffset: yOffset + _layoutChangeOffset.dy);
@@ -2995,7 +2985,7 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
                                 View.of(context).viewInsets,
                                 View.of(context).devicePixelRatio)
                             .bottom;
-                        if ((widget.scrollDirection ==
+                        if ((_scrollDirection ==
                                     PdfScrollDirection.horizontal ||
                                 widget.pageLayoutMode ==
                                     PdfPageLayoutMode.single) &&
@@ -3181,6 +3171,10 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
                           if (_document != null &&
                               widget.onDocumentLoaded != null) {
                             _isDocumentLoadInitiated = false;
+                            _document!.pageSettings.orientation =
+                                getOrientation(widget.documentOrientation!);
+                            _document!.pageSettings.size = widget.documentSize!;
+
                             widget.onDocumentLoaded!(
                                 PdfDocumentLoadedDetails(_document!));
                           }
@@ -3795,7 +3789,7 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
       bool canRenderImage = !(_pdfScrollableStateKey.currentState
                   ?.scrollHeadStateKey.currentState?.isScrollHeadDragged ??
               true) &&
-          !(widget.scrollDirection == PdfScrollDirection.vertical
+          !(_scrollDirection == PdfScrollDirection.vertical
               ? _pdfScrollableStateKey.currentState?.scrollHeadStateKey
                       .currentState?.isScrolled ??
                   false
@@ -3826,14 +3820,14 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
         return value;
       });
       if (_isOrientationChanged &&
-          widget.scrollDirection == PdfScrollDirection.horizontal &&
+          _scrollDirection == PdfScrollDirection.horizontal &&
           _deviceOrientation == MediaQuery.of(context).orientation) {
         _isOrientationChanged = false;
       }
       if (_isOrientationChanged &&
           (!canRenderImage ||
               _deviceOrientation == MediaQuery.of(context).orientation) &&
-          widget.scrollDirection == PdfScrollDirection.vertical) {
+          _scrollDirection == PdfScrollDirection.vertical) {
         _isOrientationChanged = false;
       }
       if ((_startPage != startPage && _endPage != endPage) ||
@@ -4137,12 +4131,12 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
       double xPosition = scrollOffset.dx;
       double yPosition = scrollOffset.dy;
       if (_pdfViewerController.pageNumber > 1 &&
-          widget.scrollDirection == PdfScrollDirection.vertical) {
+          _scrollDirection == PdfScrollDirection.vertical) {
         yPosition = scrollOffset.dy -
             _pdfPages[_pdfViewerController.pageNumber]!.pageOffset;
       }
       if (_pdfViewerController.pageNumber > 1 &&
-          widget.scrollDirection == PdfScrollDirection.horizontal) {
+          _scrollDirection == PdfScrollDirection.horizontal) {
         xPosition = scrollOffset.dx -
             _pdfPages[_pdfViewerController.pageNumber]!.pageOffset;
       }
@@ -4297,7 +4291,7 @@ class SfPdfViewerState extends State<SfPdfViewer> with WidgetsBindingObserver {
     Size newSize = constraints.constrainSizeAndAttemptToPreserveAspectRatio(
         Size(originalWidth, originalHeight));
     if ((widget.pageLayoutMode == PdfPageLayoutMode.single ||
-            widget.scrollDirection == PdfScrollDirection.horizontal &&
+            _scrollDirection == PdfScrollDirection.horizontal &&
                 Orientation.portrait == MediaQuery.of(context).orientation) &&
         newSize.height > newHeight) {
       BoxConstraints newConstraints = BoxConstraints(
